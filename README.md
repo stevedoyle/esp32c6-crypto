@@ -1,21 +1,23 @@
-# ESP32-C6 AES Crypto Benchmarking
+# ESP32-C6 Crypto Benchmarking
 
-This project benchmarks AES (Advanced Encryption Standard) performance on the ESP32-C6 microcontroller using both blocking and DMA (Direct Memory Access) modes.
+This project benchmarks cryptographic performance on the ESP32-C6 microcontroller using hardware-accelerated crypto engines for both AES encryption and SHA-256 hashing.
 
 ## Overview
 
-The ESP32-C6 features hardware-accelerated AES encryption capabilities. This benchmark suite measures the throughput performance of AES-256-CTR encryption across various buffer sizes, comparing different implementation approaches:
+The ESP32-C6 features dedicated hardware acceleration for cryptographic operations. This benchmark suite measures the performance of:
 
-- **Blocking AES**: Traditional 16-byte block processing
-- **DMA AES**: High-throughput processing with Direct Memory Access for larger buffers
+- **AES-256-CTR encryption** with DMA acceleration for high-throughput data processing
+- **SHA-256 hashing** for data integrity and authentication applications
 
 ## Features
 
-- AES-256-CTR encryption benchmarking
+- AES-256-CTR encryption benchmarking with DMA acceleration
+- SHA-256 hash function benchmarking
 - Multiple buffer size testing (64 bytes to 32 KB)
-- DMA-accelerated processing for improved throughput
 - Detailed performance metrics including:
-  - Throughput in MB/s
+  - AES throughput in MB/s
+  - SHA-256 processing time in microseconds
+  - Timing overhead measurement
 
 ## Hardware Requirements
 
@@ -38,7 +40,7 @@ The ESP32-C6 features hardware-accelerated AES encryption capabilities. This ben
    ```bash
    # Install Rust
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   
+
    # Install ESP32 toolchain
    cargo install espup
    espup install
@@ -68,9 +70,9 @@ cargo monitor
 
 ## Benchmark Results
 
-The benchmark tests AES-256-CTR encryption performance across different buffer sizes:
+The benchmark tests both AES-256-CTR encryption and SHA-256 hashing performance across different buffer sizes:
 
-- **64 bytes** - Small packet encryption
+- **64 bytes** - Small packet encryption/hashing
 - **128 bytes** - Typical IoT message size
 - **256 bytes** - Medium data blocks
 - **512 bytes** - Larger data blocks
@@ -81,7 +83,7 @@ The benchmark tests AES-256-CTR encryption performance across different buffer s
 - **16 KB** - High-throughput processing, TLS
 - **32 KB** - Maximum buffer size
 
-### Expected Performance
+### AES-256-CTR Performance
 
 Actual performance results on ESP32-C6 at 40MHz CPU clock using AES-256-CTR with DMA:
 
@@ -98,7 +100,24 @@ Actual performance results on ESP32-C6 at 40MHz CPU clock using AES-256-CTR with
 | 16 KB       | 25.56 MB/s       |
 | 32 KB       | 26.06 MB/s       |
 
-*Performance measured using AES-256-CTR encryption with DMA acceleration. Results may vary based on system configuration and workload.*
+### SHA-256 Performance
+
+SHA-256 hashing performance with hardware acceleration:
+
+| Buffer Size | Processing Time |
+|-------------|-----------------|
+| 64 bytes    | 28 μs           |
+| 128 bytes   | 24 μs           |
+| 256 bytes   | 24 μs           |
+| 512 bytes   | 24 μs           |
+| 1 KB        | 23 μs           |
+| 2 KB        | 24 μs           |
+| 4 KB        | 24 μs           |
+| 8 KB        | 24 μs           |
+| 16 KB       | 24 μs           |
+| 32 KB       | 24 μs           |
+
+*Performance measured using hardware-accelerated crypto engines. Results may vary based on system configuration and workload.*
 
 ## Code Structure
 
@@ -113,7 +132,11 @@ README.md                # This file
 
 ### Key Components
 
-- **`benchmark_aes_dma()`**: DMA-based AES benchmarking function
+- **`benchmark_aes_dma()`**: High-level AES benchmarking function that tests multiple buffer sizes
+- **`benchmark_single_aes_dma()`**: DMA-based AES benchmarking for a single buffer size
+- **`benchmark_sha256()`**: SHA-256 hashing benchmark across multiple buffer sizes
+- **`benchmark_single_sha256()`**: Single SHA-256 hash operation timing
+- **`timestamp_overhead()`**: Measures timing overhead for accurate performance measurement
 - **Buffer management**: Efficient DMA buffer allocation and reuse
 - **Performance measurement**: High-precision timing using ESP32-C6 hardware timers
 
@@ -145,9 +168,10 @@ Adjust logging verbosity by setting the `RUST_LOG` environment variable:
 This benchmark uses:
 - **AES-256**: 256-bit key size for strong encryption
 - **CTR Mode**: Counter mode for stream cipher operation
-- **Test vectors**: Zero-filled keys and data for consistent benchmarking
+- **SHA-256**: 256-bit cryptographic hash function
+- **Test vectors**: Zero-filled keys and test patterns for consistent benchmarking
 
-⚠️ **Warning**: This code is for benchmarking purposes only. Do not use the test keys or initialization vectors in production applications.
+⚠️ **Warning**: This code is for benchmarking purposes only. Do not use the test keys, initialization vectors, or hash inputs in production applications.
 
 ## Performance Optimization Tips
 
