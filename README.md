@@ -83,7 +83,7 @@ The benchmark tests AES-256-CTR encryption performance across different buffer s
 
 ### Expected Performance
 
-Actual performance results on ESP32-C6 at maximum CPU clock using AES-256-CTR with DMA:
+Actual performance results on ESP32-C6 at 40MHz CPU clock using AES-256-CTR with DMA:
 
 | Buffer Size | Throughput (MB/s) |
 |-------------|-------------------|
