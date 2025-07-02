@@ -6,11 +6,16 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use core::u32;
+
+use crypto_bigint::{Uint, U2048};
 use esp_backtrace as _;
 use esp_hal::aes::dma::{AesDma, CipherMode};
 use esp_hal::aes::{Aes, Mode};
 use esp_hal::clock::CpuClock;
 use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
+use esp_hal::rsa::operand_sizes::Op2048;
+use esp_hal::rsa::{Rsa, RsaModularExponentiation};
 use esp_hal::sha::{Sha, Sha256};
 use esp_hal::time::{Duration, Instant};
 use esp_hal::{dma_buffers, main};
@@ -24,7 +29,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 fn benchmark_aes_dma(aes: AesDma, data_sizes: &[usize]) {
     // Pre-warm the AES DMA
-    let (mut aes, throughput) = benchmark_single_aes_dma(aes, 64);
+    let (mut aes, _) = benchmark_single_aes_dma(aes, 64);
 
     // Benchmark for each data size
     for &size in data_sizes {
@@ -130,6 +135,63 @@ fn timestamp_overhead() -> Duration {
     start_time.elapsed()
 }
 
+fn benchmark_rsa(mut rsa: Rsa<'_, esp_hal::Blocking>) {
+    // Dummy values for RSA modular exponentiation
+    // These values are not secure and should not be used in production.
+    // They are only for benchmarking purposes.
+    // The values are chosen to be large enough to fit in 2048 bits.
+    const BIGNUM_1: U2048 = Uint::from_be_hex(
+        "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b71\
+        9d8ca980b7b3c0389c1c7c67dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878c\
+        7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d\
+        8ca980b7b3c0389c1c7c67dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878c7f\
+        61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8c\
+        a980b7b3c0389c1c7c67dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878c7f61\
+        058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca9\
+        80b7b3c0389c1c7c67dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",
+    );
+    const BIGNUM_2: U2048 = Uint::from_be_hex(
+        "1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759a\
+        fac15a01f3c4c83ec2d2f666bd22f71c3c1f075ec0e2cb0cb29994d091b73f51\
+        1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759a\
+        fac15a01f3c4c83ec2d2f666bd22f71c3c1f075ec0e2cb0cb29994d091b73f51\
+        1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759a\
+        fac15a01f3c4c83ec2d2f666bd22f71c3c1f075ec0e2cb0cb29994d091b73f51\
+        1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759a\
+        fac15a01f3c4c83ec2d2f666bd22f71c3c1f075ec0e2cb0cb29994d091b73f51",
+    );
+    const BIGNUM_3: U2048 = Uint::from_be_hex(
+        "6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38\
+        df7118cf5dd45b9b63d293b67aeafa9ba25feb8712f188cb139b7d9b9af1c361\
+        6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38\
+        df7118cf5dd45b9b63d293b67aeafa9ba25feb8712f188cb139b7d9b9af1c361\
+        6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38\
+        df7118cf5dd45b9b63d293b67aeafa9ba25feb8712f188cb139b7d9b9af1c361\
+        6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38\
+        df7118cf5dd45b9b63d293b67aeafa9ba25feb8712f188cb139b7d9b9af1c361",
+    );
+
+    let r: U2048 = Uint::MAX;
+
+    let mut outbuf = [0_u32; U2048::LIMBS];
+    let mut mod_exp = RsaModularExponentiation::<Op2048, _>::new(
+        &mut rsa,
+        BIGNUM_2.as_words(),
+        BIGNUM_3.as_words(),
+        u32::MAX - 1,
+    );
+
+    let start_time = Instant::now();
+    mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
+    mod_exp.read_results(&mut outbuf);
+    let elapsed = start_time.elapsed();
+
+    info!(
+        "RSA-2048 Modular Exponentiation completed in {} miliseconds",
+        elapsed.as_millis()
+    );
+}
+
 #[main]
 fn main() -> ! {
     // generator version: 0.4.0
@@ -166,6 +228,10 @@ fn main() -> ! {
     info!("Starting SHA256 Benchmark");
     let mut sha = Sha::new(peripherals.SHA);
     benchmark_sha256(&mut sha, &data_sizes);
+
+    info!("Starting RSA Benchmark");
+    let rsa = Rsa::new(peripherals.RSA);
+    benchmark_rsa(rsa);
 
     loop {
         let delay_start = Instant::now();
